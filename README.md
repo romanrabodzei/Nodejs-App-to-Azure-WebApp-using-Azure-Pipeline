@@ -1,5 +1,4 @@
-# Nodejs-App-to-Azure-WebApp-using-Azure-Pipeline
-Building and Developing Node.js application to the Azure Web App using Azure Pipelines
+# Building and Developing Node.js application to the Azure Web App using Azure Pipelines
 
 ## Deploy the App Service Infrastructure:
 
