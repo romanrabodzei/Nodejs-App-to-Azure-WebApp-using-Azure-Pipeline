@@ -7,32 +7,87 @@ trigger:
     - azure-deploy.json
     - azure-pipelines.yml
 
-pool:
-  vmImage: 'Ubuntu-latest'
+stages:
+  - stage: Build Application
+    jobs:
+    - job: Build
+      pool:
+        vmImage: 'Ubuntu-latest'
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+      steps:
+      - task: NodeTool@0
+        inputs:
+          versionSpec: '10.x'
+        displayName: 'Install Node.js'
 
-- script: |
-    npm install
-  displayName: 'npm install'
+      - script: |
+          npm install
+        displayName: 'npm install'
 
-- script: |
-    npm test
-  displayName: 'npm test'
+      - script: |
+          npm test
+        displayName: 'npm test'
 
-- task: ArchiveFiles@2
-  displayName: 'Archive files'
-  inputs:
-    rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
-    includeRootFolder: false
+      - task: ArchiveFiles@2
+        displayName: 'Archive files'
+        inputs:
+          rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+          includeRootFolder: false
 
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish artifacts'
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'nodejsap'
-    publishLocation: 'Container'
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish artifacts'
+        inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'nodejsap'
+          publishLocation: 'Container'
+
+  - stage: Release Pipeline
+    jobs:
+    - job: Create
+      pool:
+        vmImage: 'ubuntu-latest'
+      variables:
+        LOCATION: 'westeurope'
+        RG: 'nodejsapprg'
+        SERVPLAN: 'nodejsappsp'
+        WEBAPP: 'nodejsapplication001'
+        
+      steps:
+      - task: AzureCLI@2
+        displayName: 'Creating Resource Group'
+        inputs:
+          azureSubscription: 'Azure Free Subscription'
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: 'az group create --location $(LOCATION) --name $(RG)'
+
+      - task: AzureCLI@2
+        displayName: 'Create Application Service Plan'
+        inputs:
+          azureSubscription: 'Azure Free Subscription'
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: 'az appservice plan create --resource-group $(RG) --name $(SERVPLAN) --location $(LOCATION) --is-linux --sku S1'
+
+      - task: AzureCLI@2
+        displayName: 'Creating Web Application'
+        inputs:
+          azureSubscription: 'Azure Free Subscription'
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: 'az webapp create --resource-group $(RG) --plan $(SERVPLAN) --name $(WEBAPP) --runtime "node|10.14"'
+
+      - task: AzureRmWebAppDeployment@4
+        displayName: 'Azure App Service Deploy'
+        inputs:
+          azureSubscription: 'Azure Free Subscription'
+          appType: webAppLinux
+          WebAppName: '$(WEBAPP)'
+        
+      - task: AzureCLI@2
+        displayName: 'Remove Azure Resources'
+        inputs:
+          azureSubscription: 'Azure Free Subscription'
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: 'az group delete --name $(RG) --no-wait --yes'
